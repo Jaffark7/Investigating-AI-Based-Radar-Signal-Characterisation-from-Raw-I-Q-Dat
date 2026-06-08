@@ -1,9 +1,0 @@
-# normalise line endings to LF in the repo
-* text=auto eol=lf
-
-# treat binary artifacts as binary (no line-ending conversion)
-*.png binary
-*.pth binary
-*.npy binary
-*.h5  binary
-*.pdf binary
