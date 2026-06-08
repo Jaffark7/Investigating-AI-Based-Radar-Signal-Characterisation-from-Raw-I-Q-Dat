@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "radar"
+version = "0.1.0"
+description = "AI-based radar signal characterisation from raw I/Q — multi-task CNN on RadChar."
+requires-python = ">=3.9"
+dependencies = ["numpy", "h5py", "torch", "matplotlib", "jupyter"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
