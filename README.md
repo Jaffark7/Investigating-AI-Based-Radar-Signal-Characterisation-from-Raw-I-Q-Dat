@@ -1,6 +1,6 @@
 # Investigating AI-Based Radar Signal Characterisation from Raw I/Q Data
 
-*A self-directed, thesis-style learning project.*
+*A self-directed learning project.*
 
 A learning project on **radar signal characterisation**: a single 1D
 convolutional neural network that, from raw I/Q data, predicts a radar signal's
