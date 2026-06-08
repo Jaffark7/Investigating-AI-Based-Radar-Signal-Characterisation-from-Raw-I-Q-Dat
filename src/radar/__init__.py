@@ -1,1 +1,1 @@
-"""radar — shared code for the RadChar DSP-vs-CNN project."""
+"""radar — shared code for the RadChar multi-task signal characterisation project."""

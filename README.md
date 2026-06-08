@@ -1,8 +1,12 @@
-# Radar Signal Classification — DSP Baseline vs 1D CNN
+# Investigating AI-Based Radar Signal Characterisation from Raw I/Q Data
 
-A learning project on **radar signal characterisation**: classifying five radar
-signal types directly from raw I/Q data, comparing a traditional DSP baseline
-against a small 1D convolutional neural network.
+*A self-directed, thesis-style learning project.*
+
+A learning project on **radar signal characterisation**: a single 1D
+convolutional neural network that, from raw I/Q data, predicts a radar signal's
+**type** *and* estimates its four pulse parameters (number of pulses, pulse
+width, PRI, time delay) — the full RadChar task — benchmarked against the
+published RadChar results.
 
 I built this to learn two things at once — **how radar signals actually work**
 (pulses, I/Q, modulation schemes, SNR) and **how to combine radar with deep
@@ -11,48 +15,88 @@ was inspired by a similar project on *bistatic* radar data at a Swedish defence
 company; I didn't have access to bistatic data, so I used the open **RadChar**
 dataset of monostatic pulsed-radar signals instead. It's purely educational.
 
-> **Status: work in progress.** The headline numbers below are preliminary and
-> will be regenerated on the baseline dataset with the benchmark-aligned setup
-> described under *Benchmarking*.
-
 ## What the project does
 
 - **Explores** the RadChar dataset and what raw radar I/Q looks like (notebooks 01–02).
-- **Builds a traditional DSP baseline** — matched-filter pulse detection and a
-  spectral-template classifier, no neural network (notebook 03 + `radar.traditional`).
-- **Trains a 1D CNN** on raw I/Q (two channels, I and Q) to classify signal type
-  (notebook 04 + `radar.model`).
-- **Compares** both methods on the *same* held-out test set, broken down by SNR,
-  and benchmarks against the published RadChar results (notebook 05).
+- **Trains `RadarMTL`** — one shared 1D-CNN backbone feeding five heads: one
+  classification head (signal type) and four regression heads (the pulse
+  parameters), on raw I/Q (notebook 03 + `radar.model`).
+- **Benchmarks** the model against the published RadChar Table 1 (classification
+  accuracy *and* regression MAE) across SNR, and reproduces its Fig. 3 curves
+  (notebook 04).
 
-## Result (preliminary)
+## The model
 
-Classification accuracy by SNR, evaluated on the held-out test set. Reference
-values are the RadChar paper's reported **classification accuracy**.
+`RadarMTL` is a multi-task network: a shared convolutional backbone (3 conv
+blocks, 2 → 32 → 64 → 128 channels, adaptive average pool → 128-dim features)
+branches into five heads that together form the **Pulse Descriptor Word** —
+signal type plus number of pulses, pulse width, PRI and time delay. It is trained
+with cross-entropy on the class head and L1 loss on each regression head,
+combined as a weighted sum (the paper's recipe).
+
+## Results
+
+Evaluated on the held-out test set. Reference values are the RadChar paper's
+reported figures ([arXiv:2306.13105](https://arxiv.org/abs/2306.13105)). The paper's
+four models are CNN1D / CNN2D (the paper's plain-CNN baselines) and IQST-S / IQST-L
+(its transformers — the headline models). Ours is a 1D CNN, closest in spirit to CNN1D.
+
+My goal was understanding radar and multi-task learning, not topping the leaderboard
+— but the full benchmark is here for anyone interested.
+
+**Classification accuracy by SNR** (higher is better; bold = best of all five).
 
 | Model | −10 dB | 0 dB | +10 dB |
 |-------|--------|------|--------|
 | CNN1D (RadChar paper) | 0.757 | 0.998 | 1.000 |
+| CNN2D (RadChar paper) | 0.673 | 0.983 | 0.998 |
 | IQST-S (RadChar paper) | 0.792 | 0.999 | 1.000 |
 | IQST-L (RadChar paper) | 0.791 | 0.998 | 1.000 |
-| **This project (1D CNN)** | **~0.82** | **~1.00** | **~1.00** |
+| **This project (`RadarMTL`)** | **0.794** | **1.000** | 1.000 |
 
-![Comparison](results/comparison_plot.png)
+**Regression MAE by SNR** (lower is better). Number of pulses is a count; pulse
+width / PRI / time delay are in microseconds. Bold marks where `RadarMTL` is the
+best of all five models for that parameter and SNR.
 
-> Note: this project's `RadarCNN` is a **classification-only** 1D CNN. The paper's
-> models are **multi-task** (classification + four regression heads); only the
-> classification-accuracy column is compared here. Benchmark source: RadChar
-> paper, [arXiv:2306.13105](https://arxiv.org/abs/2306.13105).
+| Task | Model | −10 dB | 0 dB | +10 dB |
+|------|-------|--------|------|--------|
+| number of pulses | CNN1D (paper) | 0.729 | 0.193 | 0.085 |
+| | CNN2D (paper) | 0.793 | 0.174 | 0.090 |
+| | IQST-S (paper) | 0.733 | 0.294 | 0.251 |
+| | IQST-L (paper) | 0.752 | 0.195 | 0.124 |
+| | **`RadarMTL` (ours)** | 0.971 | **0.162** | **0.077** |
+| pulse width (µs) | CNN1D (paper) | 1.413 | 0.560 | 0.340 |
+| | CNN2D (paper) | 1.466 | 0.801 | 0.505 |
+| | IQST-S (paper) | 1.282 | 0.628 | 0.364 |
+| | IQST-L (paper) | 1.253 | 0.579 | 0.334 |
+| | **`RadarMTL` (ours)** | 1.342 | **0.367** | **0.171** |
+| PRI (µs) | CNN1D (paper) | 0.999 | 0.330 | 0.209 |
+| | CNN2D (paper) | 1.054 | 0.420 | 0.299 |
+| | IQST-S (paper) | 0.816 | 0.273 | 0.192 |
+| | IQST-L (paper) | 0.799 | 0.286 | 0.225 |
+| | **`RadarMTL` (ours)** | 1.427 | 0.448 | 0.200 |
+| time delay (µs) | CNN1D (paper) | 1.349 | 0.385 | 0.206 |
+| | CNN2D (paper) | 1.729 | 0.638 | 0.443 |
+| | IQST-S (paper) | 1.229 | 0.415 | 0.277 |
+| | IQST-L (paper) | 1.253 | 0.379 | 0.233 |
+| | **`RadarMTL` (ours)** | 1.563 | 0.396 | **0.205** |
+
+![Benchmark across SNR](results/benchmark_fig3.png)
+
+Roughly: `RadarMTL` gives the best classification at every SNR, and wins most
+regression parameters at moderate-to-high SNR. In heavy noise (−10 dB) the paper's
+IQST transformers pull ahead on the timing parameters (PRI, time delay) — attention
+seems to handle global pulse timing better than a CNN when the signal is buried in
+noise.
 
 ## Project structure
 
-- `notebooks/` — the story, 01 (explore) → 05 (compare)
+- `notebooks/` — the story, 01 (explore) → 04 (benchmark)
 - `src/radar/` — reusable code
-  - `data.py` — `load_radchar`, `make_split` (deterministic 70/15/15)
-  - `model.py` — `RadarCNN`
-  - `traditional.py` — `spectral_feature`, `build_templates`, `classify`
-- `results/` — trained model, split indices, plots
-- `docs/project_plan.md` — the full project plan
+  - `data.py` — `load_radchar`, `make_split` (deterministic 70/15/15),
+    `regression_targets`, `MinMaxNormaliser`
+  - `model.py` — `RadarMTL`
+- `results/` — trained model, split indices, normaliser stats, plots
 
 ## Setup
 
@@ -65,20 +109,27 @@ the `.h5` file in `data/` (the data directory is git-ignored). The notebooks
 expect `data/RadChar-Baseline.h5`; rename your downloaded file to match, or
 edit the `DATA_PATH` constant at the top of each notebook.
 
-## Benchmarking against the RadChar paper
+Then launch Jupyter and run the notebooks in order:
 
-To compare fairly against the paper's classification results, match their
-training setup (paper §3.1):
+```bash
+jupyter notebook   # run notebooks 01 → 04 in order
+```
 
-- 70/15/15 train/val/test split *(already used)*
-- batch size 64, Adam optimiser *(already used)*
-- learning rate **5e-4**, up to **100 epochs**
-- **standardise the raw I/Q to the training-set mean/variance** (fit on train
-  only, apply to all splits) — the paper's numbers assume this preprocessing
-- evaluate classification accuracy across the full −20…+20 dB SNR range, and
-  report the −10 / 0 / +10 dB points
+## Training recipe
 
-Training (notebook 04) needs a GPU; the final run was done on Kaggle.
+Matches the paper's setup (paper §3.1) so the benchmark is fair:
+
+- 70/15/15 train/val/test split, batch size 64, Adam optimiser
+- learning rate **5e-4**, up to **100 epochs** with early stopping
+- raw I/Q **standardised to the training mean/variance** (fit on train only,
+  applied to all splits) — part of the paper's recipe
+- regression targets normalised to [0, 1] using **train-set min/max only** (no
+  leakage), de-normalised back to real units for MAE reporting
+- loss weights `{type: 0.1, n_pulses/pw/pri/td: 0.225}`, exposed as `TASK_WEIGHTS`
+- evaluation across the full −20…+20 dB SNR range, reporting the −10 / 0 / +10 dB
+  points for Table 1
+
+Training (notebook 03) needs a GPU; the run was done on locally on my GPU.
 
 ## What I learned
 
@@ -87,18 +138,18 @@ Training (notebook 04) needs a GPU; the final run was done on Kaggle.
   time delay shape a waveform.
 - **The five RadChar signal classes** — Barker codes, polyphase Barker codes,
   Frank codes, LFM (chirp) pulses, and unmodulated pulse trains — and that each
-  has a distinct *frequency fingerprint*, which is what makes spectral template
-  matching possible.
-- **Why a DSP baseline matters and where it breaks** — a fixed-threshold matched
-  filter and spectral templates work at high SNR but collapse toward chance in
-  heavy noise; that failure mode is exactly what motivates the learned model.
+  has a distinct *frequency fingerprint*.
 - **Treating I/Q as a 2-channel sequence** for a 1D CNN, instead of reshaping it
   into an image — keeping the temporal structure of the signal intact.
+- **Multi-task learning** — one shared backbone solving classification and
+  regression at once, and combining losses on different scales into a single
+  weighted objective.
 - **Regularisation in practice** — dropout, weight decay, and early stopping, and
   how they trade off training fit against generalisation.
-- **Honest evaluation** — a fixed, seeded split saved to disk; templates fit on
-  training data only; both methods scored on the identical test set with no
-  leakage; and benchmarking against published numbers rather than self-reporting.
+- **Honest evaluation** — a fixed, seeded split saved to disk; the target
+  normaliser fit on training data only; the model scored on the identical test
+  set with no leakage; and benchmarking against published numbers rather than
+  self-reporting.
 
 ## Citation
 
